@@ -12,12 +12,12 @@ from flask import Flask, request, jsonify
 app = Flask(__name__)
 app.config['API_KEY'] = 'oEfC3PglPKoCg1jDa833awsnTLoCxWSjbumTypmSEbNgWAincCp00DkcFEw45JznC6Cou73GrU07VieU01ktlsckPyqlWoSU75Bf'
 
-class_names = ['no_dr', 'mild', 'moderate', 'severe', 'proliferative_dr']
+class_names = ['Mild', 'Moderate', 'No DR', 'Proliferate DR', 'Severe']
 
 #Load Model
 detection_model_path_1 = 'model/ImageDetection1.pt'
 detection_model_path_2 = 'model/ImageDetection2.pt'
-model_path = 'model/optiguard_model_v1.h5'
+model_path = 'model/optiguard_model_v2.h5'
 CNN = tf.keras.models.load_model(model_path)
 
 
@@ -116,10 +116,36 @@ def mask_ellipse(image):
 import cv2
 import numpy as np
 
+# Same as boost_red_yellow_noscale function in training notebook
+def preprocess_image(image, brightness_factor=0.65) :
+    # Lower the brightness of all channel
+    image = np.clip(image * brightness_factor, 0, 255).astype(np.float32)
+
+    # Set the boost factor
+    red_boost_factor = 1.8
+    yellow_boost_factor = 1.4
+
+    # Apply boost factor
+    red_channel = np.clip(image[:, :, 2] * red_boost_factor, 0, 255)
+    green_channel = np.clip(image[:, :, 1] * yellow_boost_factor, 0, 255)
+
+    # Combine the channel back
+    processed_image = np.stack([red_channel, green_channel, image[:, :, 2]], axis=-1).astype(np.uint8)
+
+    return processed_image
+
 def ConvolutionalNN(image):
+    # Convert image to BGR
     img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-    img_resized = cv2.resize(img, (324, 324))
+
+    # Resize to 244x244
+    img_resized = cv2.resize(img, (224, 224))
+
+    # Convert to numpy array and preprocess the image
     img_array = np.array(img_resized)
+    img_array = preprocess_image(img_resized)
+
+    # Expand for the model input
     img_array = np.expand_dims(img_array, axis=0)
     
     model = CNN
@@ -144,6 +170,82 @@ def ConvolutionalNN(image):
 @app.route('/')
 def index():
     return jsonify({'message': 'Hello World!'})
+
+
+@app.route('/predict/file', methods=['POST'])
+def predict_file():
+    # Check for API key
+    api_key = request.headers.get('x-api-key')
+    if api_key != app.config['API_KEY']:
+        return jsonify({'success': False, 'error': 'API Key tidak valid'}), 401
+    
+    # Check if the request contains a file
+    if 'fundus_image' not in request.files:
+        return jsonify({'success': False, 'error': 'Fundus image tidak ditemukan'}), 400
+    
+    fundus_file = request.files['fundus_image']
+    
+    try:
+        # Read the uploaded file
+        file_bytes = fundus_file.read()
+        np_arr = np.frombuffer(file_bytes, np.uint8)
+        image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+        height, width, _ = image_np.shape
+        print(f"Width: {width}, Height: {height}")
+        
+        if (height/width) > 1.5 or (width/height) > 1.5:    
+            detected_image_1 = objectDetection(image_np, detection_model_path_1)
+            if len(detected_image_1) == 0:
+                print('Object detection 1 failed')
+                return jsonify({
+                    'success': True, 
+                    'message': 'Tidak ada fundus yang terdeteksi',
+                    'data': {
+                        'predicted_class': "",
+                        'cropped_image': ''
+                    }
+                }), 200
+            
+            image_np = detected_image_1[0]
+        
+        detected_image_2 = objectDetection(image_np, detection_model_path_2)
+        if len(detected_image_2) == 0:
+            print('Object detection 2 failed')
+            
+            return jsonify({
+                'success': True, 
+                'message': 'Tidak ada fundus yang terdeteksi',
+                'data': {
+                    'predicted_class': "",
+                    'cropped_image': ''
+                }
+            }), 200
+        
+        input_image = detected_image_2[0]
+        input_image = Image.fromarray(cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB))
+        output_image = mask_ellipse(input_image)
+        output_image = cv2.cvtColor(np.array(output_image), cv2.COLOR_RGB2BGR)
+
+        predicted_class = ConvolutionalNN(output_image)
+        print(predicted_class)
+        
+        # Convert output_image to base64
+        _, buffer = cv2.imencode('.jpg', output_image)
+        output_image_base64 = base64.b64encode(buffer).decode('utf-8')
+
+        return jsonify({
+            'success': True,
+            'message': "Berhasil mendeteksi fundus",
+            'data': {
+                'predicted_class': predicted_class, 
+                "cropped_image": output_image_base64
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
   
 @app.route('/predict', methods=['POST'])
@@ -187,14 +289,15 @@ def predict():
         detected_image_2 = objectDetection(image_np, detection_model_path_2)
         if len(detected_image_2) == 0:
             print('Object detection 2 failed')
-                return jsonify({
-                    'success': True, 
-                    'message': 'Tidak ada fundus yang terdeteksi',
-                    'data': {
-                        'predicted_class': "",
-                        'cropped_image': ''
-                    }
-                }), 200
+            
+            return jsonify({
+                'success': True, 
+                'message': 'Tidak ada fundus yang terdeteksi',
+                'data': {
+                    'predicted_class': "",
+                    'cropped_image': ''
+                }
+            }), 200
         
         input_image = detected_image_2[0]
         input_image = Image.fromarray(cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB))
