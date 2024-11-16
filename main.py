@@ -17,7 +17,7 @@ class_names = ['Mild', 'Moderate', 'No DR', 'Proliferate DR', 'Severe']
 #Load Model
 detection_model_path_1 = 'model/ImageDetection1.pt'
 detection_model_path_2 = 'model/ImageDetection2.pt'
-model_path = 'model/optiguard_model_v2.h5'
+model_path = 'model/govision_model_v2.h5'
 CNN = tf.keras.models.load_model(model_path)
 
 
