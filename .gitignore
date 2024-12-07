@@ -1,3 +1,4 @@
 .venv/
 __pycache__/
 .env
+model/govision_model_v2.h5

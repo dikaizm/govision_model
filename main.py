@@ -11,15 +11,22 @@ from ultralytics import YOLO
 from PIL import Image, ImageDraw
 from flask import Flask, request, jsonify
 
+load_dotenv(dotenv_path='.env')
+
+print("Starting...")
 app = Flask(__name__)
+app.config['PORT'] = os.getenv('PORT')
 app.config['API_KEY'] = os.getenv('API_KEY')
 app.config['MODEL_FILE_ID'] = os.getenv('MODEL_FILE_ID')
 
 # Load the model
+print("Loading model...")
 model_file_id = app.config['MODEL_FILE_ID']
 model_url = f'https://drive.google.com/uc?id={model_file_id}'
 
+print("Downloading model...")
 gdown.download(model_url, 'model/govision_model_v2.h5', quiet=False)
+print("Model downloaded")
 
 class_names = ['Mild', 'Moderate', 'No DR', 'Proliferate DR', 'Severe']
 
@@ -29,6 +36,7 @@ detection_model_path_2 = 'model/ImageDetection2.pt'
 model_path = 'model/govision_model_v2.h5'
 CNN = tf.keras.models.load_model(model_path)
 
+print("Model loaded")
 
 #OBJECT DETECTION
 def objectDetection(image, model_path):
@@ -333,4 +341,4 @@ def predict():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=app.config['PORT'])
