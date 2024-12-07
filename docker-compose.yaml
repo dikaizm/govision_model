@@ -6,8 +6,8 @@ services:
     env_file:
       - .env  # Load the environment variables from the .env file
     networks:
-      - govision-network
+      - govision-model-network
 
 networks:
-  govision-network:
+  govision-model-network:
     driver: bridge
