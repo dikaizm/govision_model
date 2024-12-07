@@ -1,8 +1,10 @@
 import base64
-import io
+import os
+from dotenv import load_dotenv
 import numpy as np
 import math
 
+import gdown
 import tensorflow as tf
 import cv2
 from ultralytics import YOLO
@@ -10,7 +12,14 @@ from PIL import Image, ImageDraw
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
-app.config['API_KEY'] = 'oEfC3PglPKoCg1jDa833awsnTLoCxWSjbumTypmSEbNgWAincCp00DkcFEw45JznC6Cou73GrU07VieU01ktlsckPyqlWoSU75Bf'
+app.config['API_KEY'] = os.getenv('API_KEY')
+app.config['MODEL_FILE_ID'] = os.getenv('MODEL_FILE_ID')
+
+# Load the model
+model_file_id = app.config['MODEL_FILE_ID']
+model_url = f'https://drive.google.com/uc?id={model_file_id}'
+
+gdown.download(model_url, 'model/govision_model_v2.h5', quiet=False)
 
 class_names = ['Mild', 'Moderate', 'No DR', 'Proliferate DR', 'Severe']
 
