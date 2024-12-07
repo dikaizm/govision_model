@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
+# RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
 
 # Set the working directory in the container
 WORKDIR /app
