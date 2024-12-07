@@ -2,7 +2,7 @@ services:
   backend-model:
     build: .
     ports:
-      - "8020:8020"
+      - "8024:8024"
     env_file:
       - .env  # Load the environment variables from the .env file
     networks:
